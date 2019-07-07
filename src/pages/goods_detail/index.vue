@@ -48,30 +48,86 @@
         <div style="float:right;" class="iconfont icon-jiantouyou"></div>
       </div>
     </div>
+    <!-- 5.0 tabs栏目的展示 -->
+    <view class="tabs">
+      <view class="tabs-head">
+        <view
+          @click="tabSelect(index)"
+          :class="[currentTabIndex===index ? 'active':'','tabs-item']"
+          v-for="(item,index) in tabs"
+          :key="index"
+        >
+          <text>{{item}}</text>
+        </view>
+      </view>
+      <view class="tabs-body">
+        <!-- 图文介绍 -->
+        <view v-show="currentTabIndex === 0">
+          <div v-html="goods.goods_introduce"></div>
+        </view>
+        <!-- 规格参数 -->
+        <view v-show="currentTabIndex === 1">
+          <view v-for="(item,index) in goods.attrs" :key="item .attr_id" class="param-item">
+            <text
+              :class="['note',index === goods.attrs.length-1?'param-item-last':'']"
+            >{{item.attr_name}}</text>
+            <text
+              :class="['description',index === goods.attrs.length-1?'param-item-last':'']"
+            >{{item.attr_vals}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+    <!-- 6.0 底部菜单条 -->
+    <view class="fixed-bar">
+      <view class="item">
+        <button class="contact-btn" open-type="contact"></button>
+        <view class="iconfont icon-kefu"></view>
+        <text class="note">联系客服</text>
+      </view>
+      <view @click="goToShopCart" class="item">
+        <view class="iconfont icon-gouwuche"></view>
+        <text class="note">购物车</text>
+      </view>
+      <view class="btn-group">
+        <view @click="addToShopCart" class="btn yellow-btn">加入购物车</view>
+        <view class="btn red-btn">立即购买</view>
+      </view>
+    </view>
   </div>
 </template>
 
 <script>
+import { addGoods } from '../../common/cart.js'
 export default {
   data() {
     return {
       goods: {}, // 商品数据
-      address: null // 收货地址
+      address: null, // 收货地址
+      currentTabIndex: 0, // 当前tab
+      tabs: ['图文介绍', '规格参数'], // tab栏
+      buy_num: 0, // 购买数量
     };
   },
   async onLoad({ goods_id }) {
+    mpvue.showLoading({
+      title: 'Loading...', //提示的内容,
+      mask: true, //显示透明蒙层，防止触摸穿透,
+      success: res => {}
+    });
     const res = await this.$axios.get(`goods/detail?goods_id=${goods_id}`);
     const { message, meta } = res.data;
     if (meta.status === 200) {
       this.goods = message;
     }
+    mpvue.hideLoading();
     // 读取存储地址
     mpvue.getStorage({
-      key: 'address',
+      key: "address",
       success: res => {
-        this.address = res.data
+        this.address = res.data;
       }
-      })
+    });
   },
   methods: {
     // 预览大图
@@ -86,30 +142,30 @@ export default {
     // 选择收货地址
     chooseAddress() {
       // 获取用户权限设置信息
-      mpvue.getSetting({
-        success: res => {
-          // 判断权限是否曾被拒绝
-          if (res.authSetting["scope.address"] === false) {
-            // 打开权限引导
-            mpvue.openSetting({
-              success: res => {
-                // 用户授权,直接为其打开选择地址界面
-                if (res.authSetting["scope.address"] === true) {
-                  mpvue.chooseAddress({
-                    success: res => {
-                      this.address = res;
-                      mpvue.setStorage({
-                        key: "address",
-                        data: res
-                      });
-                    }
-                  });
-                }
-              }
-            });
-          }
-        }
-      });
+      // mpvue.getSetting({
+      //   success: res => {
+      //     // 判断权限是否曾被拒绝
+      //     if (res.authSetting["scope.address"] === false) {
+      //       // 打开权限引导
+      //       mpvue.openSetting({
+      //         success: res => {
+      //           // 用户授权,直接为其打开选择地址界面
+      //           if (res.authSetting["scope.address"] === true) {
+      //             mpvue.chooseAddress({
+      //               success: res => {
+      //                 this.address = res;
+      //                 mpvue.setStorage({
+      //                   key: "address",
+      //                   data: res
+      //                 });
+      //               }
+      //             });
+      //           }
+      //         }
+      //       });
+      //     }
+      //   }
+      // });
       // 第一次请求权限
       mpvue.chooseAddress({
         success: res => {
@@ -120,8 +176,45 @@ export default {
           });
         },
         fail: err => {
+          if(err.errMsg === 'chooseAddress:fail auth deny')
+          wx.showModal({
+            title: '提示', //提示的标题,
+            content: '取消授权,应用将无法获得你的收货地址,请点击确认前往"我的"-"我的授权"打开授权', //提示的内容,
+            showCancel: true, //是否显示取消按钮,
+            cancelText: '取消', //取消按钮的文字，默认为取消，最多 4 个字符,
+            cancelColor: '#000000', //取消按钮的文字颜色,
+            confirmText: '确定', //确定按钮的文字，默认为取消，最多 4 个字符,
+            confirmColor: '#3CC51F', //确定按钮的文字颜色,
+            success: res => {
+              if (res.confirm) {
+                wx.switchTab({ url: '/pages/mine/main' });
+              }
+            }
+          });
         }
       });
+    },
+    // 选择tab栏
+    tabSelect(index){
+      this.currentTabIndex = index
+    },
+    // 加入购物车
+    addToShopCart() {
+      addGoods({
+        goods_id: this.goods.goods_id,
+        goods_num: 1
+      })
+      wx.showToast({
+        title: '添加成功', //提示的内容,
+        icon: 'success', //图标,
+        duration: 2000, //延迟时间,
+        mask: true, //显示透明蒙层，防止触摸穿透,
+        success: res => {}
+      });
+    },
+    // 跳转购物车
+    goToShopCart(){
+      wx.switchTab({ url: '/pages/shopcart/main' });
     }
   }
 };

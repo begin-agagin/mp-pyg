@@ -1,7 +1,7 @@
 import Vue from 'vue'
 import axios from 'axios'
-
-axios.defaults.baseURL = 'https://www.zhengzhicheng.cn/api/public/v1/'
+// 设置基准地址
+axios.defaults.baseURL = 'http://127.0.0.1:8899/api/public/v1/'
 axios.defaults.adapter = config => {
   return new Promise((resolve, reject) => {
     mpvue.request({
